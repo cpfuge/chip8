@@ -1,0 +1,5 @@
+.vs/
+.vscode/
+build/
+thirdparty/SDL2*
+CMakeLists.txt.user
