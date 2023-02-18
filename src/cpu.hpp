@@ -9,6 +9,7 @@ public:
 
     void reset();
     void execute();
+    void update_timers();
     bool load_rom_in_memory(const char* rom, uint32_t size);
     bool display_updated() { return m_display_updated; }
     void display_rendered() { m_display_updated = false; }
@@ -51,5 +52,4 @@ private:
     bool wait_key_press(uint16_t opcode);
     void fetch();
     void execute_instruction();
-    void update_timers();
 };

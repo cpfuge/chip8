@@ -76,7 +76,6 @@ void CPU::execute()
 {
     fetch();
     execute_instruction();
-    update_timers();
 }
 
 bool CPU::load_rom_in_memory(const char* rom, uint32_t size)

@@ -61,16 +61,27 @@ bool Chip8::init()
 
 void Chip8::run()
 {
+    int cycles = 0;
+
     while (!m_exit)
     {
         if (m_rom_loaded)
+        {
             m_cpu.execute();
+            cycles++;
+        }
 
         process_input();
         if (m_cpu.display_updated())
             render();
 
-        std::this_thread::sleep_for(std::chrono::microseconds(10));
+        if (cycles == TimersCycleDivision)
+        {
+            m_cpu.update_timers();
+            cycles = 0;
+        }
+
+        std::this_thread::sleep_for(std::chrono::microseconds(5));
     }
 }
 

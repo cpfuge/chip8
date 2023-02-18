@@ -30,8 +30,7 @@ private:
 
     CPU m_cpu;
 
-    static inline constexpr auto FramesPerSecond = 60;
-    static inline constexpr auto FrameTime = 1000 / FramesPerSecond;
+    static inline constexpr auto TimersCycleDivision = 9;
 
     static inline constexpr auto MENU_ID_LOAD_ROM = 1;
     static inline constexpr auto MENU_ID_EXIT = 2;
