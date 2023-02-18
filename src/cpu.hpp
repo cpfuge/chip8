@@ -10,9 +10,9 @@ public:
     void reset();
     void execute();
     bool load_rom_in_memory(const char* rom, uint32_t size);
+    bool display_updated() { return m_display_updated; }
+    void display_rendered() { m_display_updated = false; }
     const uint8_t* get_display() const { return m_display; }
-    void key_down(uint8_t key) { m_keys[key] = 1; }
-    void key_up(uint8_t key) { m_keys[key] = 0; }
 
     static inline constexpr auto MemorySize = 4096;
     static inline constexpr auto StackSize = 16;
@@ -32,13 +32,15 @@ public:
 
 private:
     Registers m_registers;
+    uint16_t m_opcode = 0x0000;
     uint8_t m_memory[MemorySize] = { 0 };
     uint16_t m_stack[StackSize] = { 0 };
     uint8_t m_delay_timer = 0;
     uint8_t m_sound_timer = 0;
     static uint8_t m_font[FontSize];
     uint8_t m_display[DisplayWidth * DisplayHeight] = { 0 };
-    uint8_t m_keys[KeyCount] = { 0 };
+    bool m_display_updated = false;
+    static int m_keymap[KeyCount];
 
     void stack_push(uint16_t value);
     uint16_t stack_pop();
@@ -47,4 +49,7 @@ private:
     void CPU::write(uint16_t address, uint8_t value);
     void draw_pixel(uint16_t opcode);
     bool wait_key_press(uint16_t opcode);
+    void fetch();
+    void execute_instruction();
+    void update_timers();
 };
