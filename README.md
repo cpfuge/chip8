@@ -1,5 +1,7 @@
 # CHIP-8 emulator
+CHIP-8 emulator written in C++ for the purpose of learning about emulation.
 
+## Screenshots
 ![Screenshot](doc/screenshot_00.png)
 
 ![Screenshot](doc/screenshot_01.png)
