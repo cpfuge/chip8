@@ -4,9 +4,13 @@ set(SOURCE_FILES
     "main.cpp"
     )
 
+set(RESOURCE_FILES
+    "res/chip8.rc"
+    )
+
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(chip8 WIN32 ${APPLICATION_TYPE} ${SOURCE_FILES})
+add_executable(chip8 WIN32 ${APPLICATION_TYPE} ${SOURCE_FILES} ${RESOURCE_FILES})
 
 target_link_libraries(chip8
     SDL2::SDL2
