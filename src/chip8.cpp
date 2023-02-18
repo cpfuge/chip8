@@ -1,16 +1,27 @@
 #include "chip8.hpp"
 #include "utils.hpp"
+#include <fstream>
 #include <SDL.h>
 #include <SDL_syswm.h>
 
 Chip8::Chip8()
-    : m_window(nullptr)
-    , m_renderer(nullptr)
-    , m_screen_texture(nullptr)
-    , m_window_width(800)
-    , m_window_height(600)
-    , m_exit(false)
 {
+    m_key_map[0x0] = SDLK_x;
+    m_key_map[0x1] = SDLK_1;
+    m_key_map[0x2] = SDLK_2;
+    m_key_map[0x3] = SDLK_3;
+    m_key_map[0x4] = SDLK_q;
+    m_key_map[0x5] = SDLK_w;
+    m_key_map[0x6] = SDLK_e;
+    m_key_map[0x7] = SDLK_a;
+    m_key_map[0x8] = SDLK_s;
+    m_key_map[0x9] = SDLK_d;
+    m_key_map[0xA] = SDLK_z;
+    m_key_map[0xB] = SDLK_c;
+    m_key_map[0xC] = SDLK_4;
+    m_key_map[0xD] = SDLK_r;
+    m_key_map[0xE] = SDLK_f;
+    m_key_map[0xF] = SDLK_v;
 }
 
 Chip8::~Chip8()
@@ -47,7 +58,7 @@ bool Chip8::init()
         return false;
     }
 
-    m_screen_texture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, Display::Width, Display::Height);
+    m_screen_texture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, CPU::DisplayWidth, CPU::DisplayHeight);
     if (!m_screen_texture)
     {
         std::string message = "SDL_CreateTexture error: " + std::string(SDL_GetError());
@@ -65,6 +76,9 @@ void Chip8::run()
 {
     while (!m_exit)
     {
+        if (m_rom_loaded)
+            m_cpu.execute();
+
         process_input();
         render();
     }
@@ -115,6 +129,20 @@ void Chip8::process_input()
             {
                 open_rom_file();
             }
+
+            for (int index = 0; index < CPU::KeyCount; index++)
+            {
+                if (event.key.keysym.sym == m_key_map[index])
+                    m_cpu.key_down(index);
+            }
+            break;
+
+        case SDL_KEYUP:
+            for (int index = 0; index < CPU::KeyCount; index++)
+            {
+                if (event.key.keysym.sym == m_key_map[index])
+                    m_cpu.key_up(index);
+            }
             break;
 
         case SDL_WINDOWEVENT:
@@ -133,10 +161,10 @@ void Chip8::process_input()
 
 void Chip8::update_screen_buffer()
 {
-    for (int index = 0; index < (Display::Width * Display::Height); index++)
+    for (int index = 0; index < (CPU::DisplayWidth * CPU::DisplayHeight); index++)
     {
-        uint8_t pixel = m_display.get_pixel(index);
-        m_screen_buffer[index] = (0x00FFFFFF * pixel) | 0xFF000000;
+        uint8_t pixel = m_cpu.get_display()[index];
+        m_screen_buffer[index] = (0xFF00FF00 * pixel) | 0xFF000000;
     }
 }
 
@@ -144,16 +172,44 @@ void Chip8::render()
 {
     SDL_SetRenderDrawColor(m_renderer, 0, 0, 0, 255);
     SDL_RenderClear(m_renderer);
-    SDL_UpdateTexture(m_screen_texture, nullptr, m_screen_buffer, Display::Width * sizeof(uint32_t));
+    update_screen_buffer();
+    SDL_UpdateTexture(m_screen_texture, nullptr, m_screen_buffer, CPU::DisplayWidth * sizeof(uint32_t));
     SDL_RenderCopy(m_renderer, m_screen_texture, nullptr, nullptr);
     SDL_RenderPresent(m_renderer);
 }
 
 void Chip8::open_rom_file()
 {
-    std::string rom_path = open_file_dialog(m_window);
-    if (rom_path.empty())
+    std::string path = open_file_dialog(m_window);
+    if (path.empty())
         return;
+
+    std::ifstream rom_file(path, std::ifstream::binary);
+    if (!rom_file.is_open())
+    {
+        std::string message = "Cannot open ROM file " + path;
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), m_window);
+        return;
+    }
+
+    uint32_t buffer_size = get_file_size(path);
+    char* buffer = static_cast<char*>(malloc(sizeof(char) * buffer_size));
+    if (!rom_file.read(buffer, buffer_size))
+    {
+        std::string message = "Cannot read ROM file " + path;
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), m_window);
+        return;
+    }
+
+    if (!m_cpu.load_rom_in_memory(buffer, buffer_size))
+    {
+        std::string message = "Cannot load ROM file " + path + " into memory, size is " + std::to_string(buffer_size);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), m_window);
+        return;
+    }
+
+    m_rom_loaded = true;
+    free(buffer);
 }
 
 HWND Chip8::get_window_handle(SDL_Window* window)
@@ -161,7 +217,7 @@ HWND Chip8::get_window_handle(SDL_Window* window)
     if (!window)
         return nullptr;
 
-    SDL_SysWMinfo win_info;
+    SDL_SysWMinfo win_info {};
     SDL_VERSION(&win_info.version);
     SDL_GetWindowWMInfo(window, &win_info);
 

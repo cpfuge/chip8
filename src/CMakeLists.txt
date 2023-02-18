@@ -1,7 +1,6 @@
 set(SOURCE_FILES
     "chip8.cpp"
     "cpu.cpp"
-    "display.cpp"
     "main.cpp"
     )
 

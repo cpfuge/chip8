@@ -1,7 +1,6 @@
 #pragma once
 
 #include "cpu.hpp"
-#include "display.hpp"
 #include <cstdint>
 #include <string>
 #include <Windows.h>
@@ -20,16 +19,18 @@ public:
     void run();
 
 private:
-    SDL_Window* m_window;
-    SDL_Renderer* m_renderer;
-    SDL_Texture* m_screen_texture;
-    int m_window_width;
-    int m_window_height;
-    bool m_exit;
-    uint32_t m_screen_buffer[Display::Width * Display::Height] = { 0 };
+    SDL_Window* m_window = nullptr;
+    SDL_Renderer* m_renderer = nullptr;
+    SDL_Texture* m_screen_texture = nullptr;
+    int m_window_width = 800;
+    int m_window_height = 600;
+    bool m_exit = false;
+    bool m_rom_loaded = false;
+    uint32_t m_screen_buffer[CPU::DisplayWidth * CPU::DisplayHeight] = { 0 };
 
     CPU m_cpu;
-    Display m_display;
+
+    uint8_t m_key_map[CPU::KeyCount];
 
     static inline constexpr auto MENU_ID_LOAD_ROM = 1;
     static inline constexpr auto MENU_ID_EXIT = 2;
