@@ -1,3 +1,3 @@
 # CHIP-8 emulator
 
-Work in progress.
+![Screenshot](doc/screenshot.png)
