@@ -65,7 +65,7 @@ void Chip8::run()
 
     while (!m_exit)
     {
-        if (m_rom_loaded)
+        if (m_rom_loaded && !m_paused)
         {
             m_cpu.execute();
             cycles++;
@@ -89,12 +89,19 @@ void Chip8::create_main_menu()
 {
     m_menu_bar = CreateMenu();
     m_file_menu = CreateMenu();
+    m_emulator_menu = CreateMenu();
 
     AppendMenu(m_menu_bar, MF_POPUP, (UINT_PTR)m_file_menu, "File");
+    AppendMenu(m_menu_bar, MF_POPUP, (UINT_PTR)m_emulator_menu, "Emulator");
 
     AppendMenu(m_file_menu, MF_STRING, MENU_ID_LOAD_ROM, "Open ROM...\tCtr+O");
     AppendMenu(m_file_menu, MF_SEPARATOR, 0, "");
     AppendMenu(m_file_menu, MF_STRING, MENU_ID_EXIT, "Exit\tAlt+F4");
+
+    AppendMenu(m_emulator_menu, MF_STRING, MENU_ID_PAUSE, "Pause\tCtr+P");
+    AppendMenu(m_emulator_menu, MF_STRING, MENU_ID_RESUME, "Resume\tCtr+P");
+    AppendMenu(m_emulator_menu, MF_SEPARATOR, 0, "");
+    AppendMenu(m_emulator_menu, MF_STRING, MENU_ID_RESET, "Reset\tCtr+R");
 
     HWND window_handle = get_window_handle(m_window);
     SetMenu(window_handle, m_menu_bar);
@@ -116,6 +123,18 @@ void Chip8::process_input()
 
                 if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_EXIT)
                     m_exit = true;
+
+                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_PAUSE)
+                    if (m_rom_loaded)
+                        m_paused = true;
+
+                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_RESUME)
+                    if (m_rom_loaded)
+                        m_paused = false;
+
+                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_RESET)
+                    if (m_rom_loaded)
+                        m_cpu.reset();
             }
             break;
 
@@ -129,6 +148,22 @@ void Chip8::process_input()
                 event.key.repeat == 0)
             {
                 open_rom_file();
+            }
+
+            if (event.key.keysym.sym == SDLK_p &&
+                event.key.keysym.mod & KMOD_CTRL &&
+                event.key.repeat == 0)
+            {
+                if (m_rom_loaded)
+                    m_paused = !m_paused;
+            }
+
+            if (event.key.keysym.sym == SDLK_r &&
+                event.key.keysym.mod & KMOD_CTRL &&
+                event.key.repeat == 0)
+            {
+                if (m_rom_loaded)
+                    m_cpu.reset();
             }
             break;
 

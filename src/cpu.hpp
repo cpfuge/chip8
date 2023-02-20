@@ -7,6 +7,7 @@ class CPU
 public:
     CPU();
 
+    void init();
     void reset();
     void execute();
     void update_timers();

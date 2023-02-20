@@ -26,6 +26,7 @@ private:
     int m_window_height = 600;
     bool m_exit = false;
     bool m_rom_loaded = false;
+    bool m_paused = false;
     uint32_t m_screen_buffer[CPU::DisplayWidth * CPU::DisplayHeight] = { 0 };
 
     CPU m_cpu;
@@ -34,9 +35,13 @@ private:
 
     static inline constexpr auto MENU_ID_LOAD_ROM = 1;
     static inline constexpr auto MENU_ID_EXIT = 2;
+    static inline constexpr auto MENU_ID_PAUSE = 3;
+    static inline constexpr auto MENU_ID_RESUME = 4;
+    static inline constexpr auto MENU_ID_RESET = 5;
 
     HMENU m_menu_bar;
     HMENU m_file_menu;
+    HMENU m_emulator_menu;
 
     void create_main_menu();
     void process_input();

@@ -45,7 +45,19 @@ int CPU::m_keymap[CPU::KeyCount] = {
 
 CPU::CPU()
 {
-    reset();
+    init();
+}
+
+void CPU::init()
+{
+    for (int index = 0; index < 16; index++)
+        m_registers.V[index] = 0x00;
+
+    std::memset(m_memory, 0x00, sizeof(m_memory));
+    for (int index = 0; index < FontSize; index++)
+        m_memory[index] = m_font[index];
+
+    std::srand(time(NULL));
 }
 
 void CPU::reset()
@@ -54,22 +66,12 @@ void CPU::reset()
     m_registers.SP = 0x00;
     m_registers.I = 0x00;
     m_opcode = 0x0000;
-
     m_delay_timer = 0;
     m_sound_timer = 0;
 
-    for (int index = 0; index < 16; index++)
-        m_registers.V[index] = 0x00;
-
-    std::memset(m_memory, 0x00, sizeof(m_memory));
     std::memset(m_stack, 0x00, sizeof(m_stack));
     std::memset(m_display, 0x00, sizeof(m_display));
-    m_display_updated = false;
-
-    for (int index = 0; index < FontSize; index++)
-        m_memory[index] = m_font[index];
-
-    std::srand(time(NULL));
+    m_display_updated = true;
 }
 
 void CPU::execute()
@@ -84,9 +86,12 @@ bool CPU::load_rom_in_memory(const char* rom, uint32_t size)
     if ((MemorySize - ResetVector) < size)
         return false;
 
-    reset();
+    init();
+
     for (int index = 0; index < size; index++)
         m_memory[index + ResetVector] = (uint8_t)rom[index];
+
+    reset();
 
     return true;
 }
