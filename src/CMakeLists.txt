@@ -2,6 +2,7 @@ set(SOURCE_FILES
     "chip8.cpp"
     "cpu.cpp"
     "main.cpp"
+    "sound.cpp"
     )
 
 set(RESOURCE_FILES

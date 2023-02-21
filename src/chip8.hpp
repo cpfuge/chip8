@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cpu.hpp"
+#include "sound.hpp"
 #include <cstdint>
 #include <string>
 #include <Windows.h>
@@ -22,6 +23,9 @@ private:
     SDL_Window* m_window = nullptr;
     SDL_Renderer* m_renderer = nullptr;
     SDL_Texture* m_screen_texture = nullptr;
+
+    Sound m_sound;
+
     int m_window_width = 800;
     int m_window_height = 600;
     bool m_exit = false;

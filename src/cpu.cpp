@@ -1,4 +1,5 @@
 #include "cpu.hpp"
+#include "sound.hpp"
 #include <cstring>
 #include <random>
 #include <cassert>
@@ -413,5 +414,14 @@ void CPU::update_timers()
         m_delay_timer--;
 
     if (m_sound_timer > 0)
+    {
+        if (m_sound_device)
+            m_sound_device->play();
         m_sound_timer--;
+    }
+    else
+    {
+        if (m_sound_device)
+            m_sound_device->stop();
+    }
 }

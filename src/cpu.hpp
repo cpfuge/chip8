@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+class Sound;
+
 class CPU
 {
 public:
@@ -15,6 +17,8 @@ public:
     bool display_updated() { return m_display_updated; }
     void display_rendered() { m_display_updated = false; }
     const uint8_t* get_display() const { return m_display; }
+
+    void set_sound_device(Sound* device) { m_sound_device = device; }
 
     static inline constexpr auto MemorySize = 4096;
     static inline constexpr auto StackSize = 16;
@@ -43,6 +47,8 @@ private:
     uint8_t m_display[DisplayWidth * DisplayHeight] = { 0 };
     bool m_display_updated = false;
     static int m_keymap[KeyCount];
+
+    Sound* m_sound_device = nullptr;
 
     void stack_push(uint16_t value);
     uint16_t stack_pop();

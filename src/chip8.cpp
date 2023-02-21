@@ -56,6 +56,11 @@ bool Chip8::init()
 
     create_main_menu();
 
+    if (!m_sound.init())
+        return false;
+
+    m_cpu.set_sound_device(&m_sound);
+
     return true;
 }
 
@@ -81,7 +86,7 @@ void Chip8::run()
             cycles = 0;
         }
 
-        std::this_thread::sleep_for(std::chrono::microseconds(5));
+        std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
 }
 
@@ -231,6 +236,8 @@ void Chip8::toggle_pause()
         return;
 
     m_paused = !m_paused;
+
+    m_sound.play();
 
     if (m_paused)
         ModifyMenu(m_emulator_menu, MENU_ID_PAUSE_RESUME, MF_STRING, MENU_ID_PAUSE_RESUME, "Resume\tCrt+P");
