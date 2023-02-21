@@ -35,9 +35,8 @@ private:
 
     static inline constexpr auto MENU_ID_LOAD_ROM = 1;
     static inline constexpr auto MENU_ID_EXIT = 2;
-    static inline constexpr auto MENU_ID_PAUSE = 3;
-    static inline constexpr auto MENU_ID_RESUME = 4;
-    static inline constexpr auto MENU_ID_RESET = 5;
+    static inline constexpr auto MENU_ID_PAUSE_RESUME = 3;
+    static inline constexpr auto MENU_ID_RESET = 4;
 
     HMENU m_menu_bar;
     HMENU m_file_menu;
@@ -49,6 +48,8 @@ private:
     void render();
 
     void open_rom_file();
+    void toggle_pause();
+    void reset();
     HWND Chip8::get_window_handle(SDL_Window* window);
     std::string Chip8::open_file_dialog(SDL_Window* owner);
 };

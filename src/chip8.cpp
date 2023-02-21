@@ -98,8 +98,7 @@ void Chip8::create_main_menu()
     AppendMenu(m_file_menu, MF_SEPARATOR, 0, "");
     AppendMenu(m_file_menu, MF_STRING, MENU_ID_EXIT, "Exit\tAlt+F4");
 
-    AppendMenu(m_emulator_menu, MF_STRING, MENU_ID_PAUSE, "Pause\tCtr+P");
-    AppendMenu(m_emulator_menu, MF_STRING, MENU_ID_RESUME, "Resume\tCtr+P");
+    AppendMenu(m_emulator_menu, MF_STRING, MENU_ID_PAUSE_RESUME, "Pause\tCtr+P");
     AppendMenu(m_emulator_menu, MF_SEPARATOR, 0, "");
     AppendMenu(m_emulator_menu, MF_STRING, MENU_ID_RESET, "Reset\tCtr+R");
 
@@ -124,17 +123,11 @@ void Chip8::process_input()
                 if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_EXIT)
                     m_exit = true;
 
-                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_PAUSE)
-                    if (m_rom_loaded)
-                        m_paused = true;
-
-                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_RESUME)
-                    if (m_rom_loaded)
-                        m_paused = false;
+                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_PAUSE_RESUME)
+                    toggle_pause();
 
                 if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_RESET)
-                    if (m_rom_loaded)
-                        m_cpu.reset();
+                    reset();
             }
             break;
 
@@ -154,16 +147,14 @@ void Chip8::process_input()
                 event.key.keysym.mod & KMOD_CTRL &&
                 event.key.repeat == 0)
             {
-                if (m_rom_loaded)
-                    m_paused = !m_paused;
+                toggle_pause();
             }
 
             if (event.key.keysym.sym == SDLK_r &&
                 event.key.keysym.mod & KMOD_CTRL &&
                 event.key.repeat == 0)
             {
-                if (m_rom_loaded)
-                    m_cpu.reset();
+                reset();
             }
             break;
 
@@ -232,6 +223,30 @@ void Chip8::open_rom_file()
 
     m_rom_loaded = true;
     free(buffer);
+}
+
+void Chip8::toggle_pause()
+{
+    if (!m_rom_loaded)
+        return;
+
+    m_paused = !m_paused;
+
+    if (m_paused)
+        ModifyMenu(m_emulator_menu, MENU_ID_PAUSE_RESUME, MF_STRING, MENU_ID_PAUSE_RESUME, "Resume\tCrt+P");
+    else
+        ModifyMenu(m_emulator_menu, MENU_ID_PAUSE_RESUME, MF_STRING, MENU_ID_PAUSE_RESUME, "Pause\tCrt+P");
+}
+
+void Chip8::reset()
+{
+    if (!m_rom_loaded)
+        return;
+
+    if (m_paused)
+        toggle_pause();
+
+    m_cpu.reset();
 }
 
 HWND Chip8::get_window_handle(SDL_Window* window)
