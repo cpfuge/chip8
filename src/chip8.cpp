@@ -237,8 +237,6 @@ void Chip8::toggle_pause()
 
     m_paused = !m_paused;
 
-    m_sound.play();
-
     if (m_paused)
         ModifyMenu(m_emulator_menu, MENU_ID_PAUSE_RESUME, MF_STRING, MENU_ID_PAUSE_RESUME, "Resume\tCrt+P");
     else
