@@ -126,7 +126,7 @@ void CPU::write(uint16_t address, uint8_t value)
     m_memory[address] = value;
 }
 
-void CPU::draw_pixel(uint16_t m_opcode)
+void CPU::draw_pixel()
 {
     uint16_t x = m_registers.V[(m_opcode & 0x0F00) >> 8];
     uint16_t y = m_registers.V[(m_opcode & 0x00F0) >> 4];
@@ -152,7 +152,7 @@ void CPU::draw_pixel(uint16_t m_opcode)
     m_display_updated = true;
 }
 
-bool CPU::wait_key_press(uint16_t m_opcode)
+bool CPU::wait_key_press()
 {
     bool key_pressed = false;
 
@@ -171,6 +171,7 @@ bool CPU::wait_key_press(uint16_t m_opcode)
 void CPU::fetch()
 {
     m_opcode = read_word(m_registers.PC);
+    m_registers.PC += 2;
 }
 
 void CPU::execute_instruction()
@@ -183,12 +184,10 @@ void CPU::execute_instruction()
         case 0x0000:
             std::memset(m_display, 0x00, sizeof(m_display));
             m_display_updated = true;
-            m_registers.PC += 2;
             break;
 
         case 0x000E:
             m_registers.PC = stack_pop();
-            m_registers.PC += 2;
             break;
         }
         break;
@@ -204,34 +203,25 @@ void CPU::execute_instruction()
 
     case 0x3000:
         if (m_registers.V[(m_opcode & 0x0F00) >> 8] == (m_opcode & 0x00FF))
-            m_registers.PC += 4;
-        else
             m_registers.PC += 2;
         break;
 
     case 0x4000:
         if (m_registers.V[(m_opcode & 0x0F00) >> 8] != (m_opcode & 0x00FF))
-            m_registers.PC += 4;
-        else
             m_registers.PC += 2;
         break;
 
     case 0x5000:
         if (m_registers.V[(m_opcode & 0x0F00) >> 8] == m_registers.V[(m_opcode & 0x000F) >> 4])
-            m_registers.PC += 4;
-        else
             m_registers.PC += 2;
-        break;
         break;
 
     case 0x6000:
         m_registers.V[(m_opcode & 0x0F00) >> 8] = m_opcode & 0x00FF;
-        m_registers.PC += 2;
         break;
 
     case 0x7000:
         m_registers.V[(m_opcode & 0x0F00) >> 8] += m_opcode & 0x00FF;
-        m_registers.PC += 2;
         break;
 
     case 0x8000:
@@ -239,22 +229,18 @@ void CPU::execute_instruction()
         {
         case 0x0000:
             m_registers.V[(m_opcode & 0x0F00) >> 8] = m_registers.V[(m_opcode & 0x00F0) >> 4];
-            m_registers.PC += 2;
             break;
 
         case 0x0001:
             m_registers.V[(m_opcode & 0x0F00) >> 8] |= m_registers.V[(m_opcode & 0x00F0) >> 4];
-            m_registers.PC += 2;
             break;
 
         case 0x0002:
             m_registers.V[(m_opcode & 0x0F00) >> 8] &= m_registers.V[(m_opcode & 0x00F0) >> 4];
-            m_registers.PC += 2;
             break;
 
         case 0x0003:
             m_registers.V[(m_opcode & 0x0F00) >> 8] ^= m_registers.V[(m_opcode & 0x00F0) >> 4];
-            m_registers.PC += 2;
             break;
 
         case 0x0004:
@@ -263,7 +249,6 @@ void CPU::execute_instruction()
                 m_registers.V[0xF] = 1;
             else
                 m_registers.V[0xF] = 0;
-            m_registers.PC += 2;
             break;
 
         case 0x0005:
@@ -272,13 +257,11 @@ void CPU::execute_instruction()
             else
                 m_registers.V[0xF] = 1;
             m_registers.V[(m_opcode & 0x0F00) >> 8] -= m_registers.V[(m_opcode & 0x00F0) >> 4];
-            m_registers.PC += 2;
             break;
 
         case 0x0006:
             m_registers.V[0xF] = m_registers.V[(m_opcode & 0x0F00) >> 8] & 0x1;
             m_registers.V[(m_opcode & 0x0F00) >> 8] >>= 1;
-            m_registers.PC += 2;
             break;
 
         case 0x0007:
@@ -287,27 +270,22 @@ void CPU::execute_instruction()
             else
                 m_registers.V[0xF] = 1;
             m_registers.V[(m_opcode & 0x0F00) >> 8] = m_registers.V[(m_opcode & 0x00F0) >> 4] - m_registers.V[(m_opcode & 0x0F00) >> 8];
-            m_registers.PC += 2;
             break;
 
         case 0x000E:
             m_registers.V[0xF] = m_registers.V[(m_opcode & 0x0F00) >> 8] >> 7;
             m_registers.V[(m_opcode & 0x0F00) >> 8] <<= 1;
-            m_registers.PC += 2;
             break;
         }
         break;
 
     case 0x9000:
         if (m_registers.V[(m_opcode & 0x0F00) >> 8] != m_registers.V[(m_opcode & 0x00F0) >> 4])
-            m_registers.PC += 4;
-        else
             m_registers.PC += 2;
         break;
 
     case 0xA000:
         m_registers.I = m_opcode & 0x0FFF;
-        m_registers.PC += 2;
         break;
 
     case 0xB000:
@@ -316,12 +294,10 @@ void CPU::execute_instruction()
 
     case 0xC000:
         m_registers.V[(m_opcode & 0x0F00) >> 8] = (std::rand() % (0xFF + 1)) & (m_opcode & 0x00FF);
-        m_registers.PC += 2;
         break;
 
     case 0xD000:
-        draw_pixel(m_opcode);
-        m_registers.PC += 2;
+        draw_pixel();
         break;
 
     case 0xE000:
@@ -329,15 +305,11 @@ void CPU::execute_instruction()
         {
         case 0x009E:
             if (SDL_GetKeyboardState(nullptr)[m_keymap[m_registers.V[(m_opcode & 0x0F00) >> 8]]])
-                m_registers.PC += 4;
-            else
                 m_registers.PC += 2;
             break;
 
         case 0x00A1:
             if (!SDL_GetKeyboardState(nullptr)[m_keymap[m_registers.V[(m_opcode & 0x0F00) >> 8]]])
-                m_registers.PC += 4;
-            else
                 m_registers.PC += 2;
             break;
         }
@@ -348,23 +320,20 @@ void CPU::execute_instruction()
         {
         case 0x0007:
             m_registers.V[(m_opcode & 0x0F00) >> 8] = m_delay_timer;
-            m_registers.PC += 2;
             break;
 
         case 0x000A:
-            if (!wait_key_press(m_opcode))
+            if (!wait_key_press())
+                m_registers.PC -= 2;
                 return;
-            m_registers.PC += 2;
             break;
 
         case 0x0015:
             m_delay_timer = m_registers.V[(m_opcode & 0x0F00) >> 8];
-            m_registers.PC += 2;
             break;
 
         case 0x0018:
             m_sound_timer = m_registers.V[(m_opcode & 0x0F00) >> 8];
-            m_registers.PC += 2;
             break;
 
         case 0x001E:
@@ -373,19 +342,16 @@ void CPU::execute_instruction()
             else
                 m_registers.V[0xF] = 0;
             m_registers.I += m_registers.V[(m_opcode & 0x0F00) >> 8];
-            m_registers.PC += 2;
             break;
 
         case 0x0029:
             m_registers.I = m_registers.V[(m_opcode & 0x0F00) >> 8] * 0x5;
-            m_registers.PC += 2;
             break;
 
         case 0x0033:
             m_memory[m_registers.I] = m_registers.V[(m_opcode & 0x0F00) >> 8] / 100;
             m_memory[m_registers.I + 1] = (m_registers.V[(m_opcode & 0x0F00) >> 8] / 10) % 10;
             m_memory[m_registers.I + 2] = m_registers.V[(m_opcode & 0x0F00) >> 8] % 10;
-            m_registers.PC += 2;
             break;
 
         case 0x0055:
@@ -393,7 +359,6 @@ void CPU::execute_instruction()
                 m_memory[m_registers.I + index] = m_registers.V[index];
 
             m_registers.I += ((m_opcode & 0x0F00) >> 8) + 1;
-            m_registers.PC += 2;
             break;
 
         case 0x0065:
@@ -401,7 +366,6 @@ void CPU::execute_instruction()
                 m_registers.V[index] = m_memory[m_registers.I + index];
 
             m_registers.I += ((m_opcode & 0x0F00) >> 8) + 1;
-            m_registers.PC += 2;
             break;
         }
         break;

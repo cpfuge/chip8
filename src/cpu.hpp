@@ -55,8 +55,8 @@ private:
     uint8_t read(uint16_t address);
     uint16_t read_word(uint16_t address);
     void CPU::write(uint16_t address, uint8_t value);
-    void draw_pixel(uint16_t opcode);
-    bool wait_key_press(uint16_t opcode);
+    void draw_pixel();
+    bool wait_key_press();
     void fetch();
     void execute_instruction();
 };
