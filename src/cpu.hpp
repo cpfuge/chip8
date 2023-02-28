@@ -36,9 +36,19 @@ public:
         uint8_t V[16] = { 0 };
     };
 
+    struct Opcode
+    {
+        uint16_t type = 0x0000;
+        uint16_t x = 0x0000;
+        uint16_t y = 0x0000;
+        uint16_t n = 0x0000;
+        uint16_t kk = 0x0000;
+        uint16_t nnn = 0x0000;
+    };
+
 private:
     Registers m_registers;
-    uint16_t m_opcode = 0x0000;
+    Opcode m_opcode;
     uint8_t m_memory[MemorySize] = { 0 };
     uint16_t m_stack[StackSize] = { 0 };
     uint8_t m_delay_timer = 0;
