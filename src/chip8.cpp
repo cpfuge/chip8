@@ -1,294 +1,389 @@
 #include "chip8.hpp"
-#include "utils.hpp"
-#include <fstream>
-#include <thread>
+#include "sound.hpp"
+
+#include <cstring>
+#include <random>
+#include <cassert>
+#include <time.h>
 #include <SDL.h>
-#include <SDL_syswm.h>
 
-Chip8::Chip8()
+uint8_t CHIP8::m_font[FontSize] = {
+    0xF0, 0x90, 0x90, 0x90, 0xF0,
+    0x20, 0x60, 0x20, 0x20, 0x70,
+    0xF0, 0x10, 0xF0, 0x80, 0xF0,
+    0xF0, 0x10, 0xF0, 0x10, 0xF0,
+    0x90, 0x90, 0xF0, 0x10, 0x10,
+    0xF0, 0x80, 0xF0, 0x10, 0xF0,
+    0xF0, 0x80, 0xF0, 0x90, 0xF0,
+    0xF0, 0x10, 0x20, 0x40, 0x40,
+    0xF0, 0x90, 0xF0, 0x90, 0xF0,
+    0xF0, 0x90, 0xF0, 0x10, 0xF0,
+    0xF0, 0x90, 0xF0, 0x90, 0x90,
+    0xE0, 0x90, 0xE0, 0x90, 0xE0,
+    0xF0, 0x80, 0x80, 0x80, 0xF0,
+    0xE0, 0x90, 0x90, 0x90, 0xE0,
+    0xF0, 0x80, 0xF0, 0x80, 0xF0,
+    0xF0, 0x80, 0xF0, 0x80, 0x80
+};
+
+int CHIP8::m_keymap[CHIP8::KeyCount] = {
+    SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3, SDL_SCANCODE_4,
+    SDL_SCANCODE_Q, SDL_SCANCODE_W, SDL_SCANCODE_E, SDL_SCANCODE_R,
+    SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_F,
+    SDL_SCANCODE_Z, SDL_SCANCODE_X, SDL_SCANCODE_C, SDL_SCANCODE_V
+};
+
+CHIP8::CHIP8()
 {
 }
 
-Chip8::~Chip8()
+bool CHIP8::init()
 {
-    SDL_DestroyTexture(m_screen_texture);
-    SDL_DestroyRenderer(m_renderer);
-    SDL_DestroyWindow(m_window);
-    SDL_Quit();
-}
-
-bool Chip8::init()
-{
-    if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
-    {
-        std::string message = "SDL_Init error: " + std::string(SDL_GetError());
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), nullptr);
-        return false;
-    }
-
-    uint32_t window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN;
-    m_window = SDL_CreateWindow("CHIP-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_window_width, m_window_height, window_flags);
-    if (!m_window)
-    {
-        std::string message = "SDL_CreateWindow error: " + std::string(SDL_GetError());
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), nullptr);
-        return false;
-    }
-
-    m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED);
-    if (!m_renderer)
-    {
-        std::string message = "SDL_CreateRenderer error: " + std::string(SDL_GetError());
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), nullptr);
-        return false;
-    }
-
-    m_screen_texture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, CPU::DisplayWidth, CPU::DisplayHeight);
-    if (!m_screen_texture)
-    {
-        std::string message = "SDL_CreateTexture error: " + std::string(SDL_GetError());
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), nullptr);
-        return false;
-    }
-
-    SDL_SetRenderDrawColor(m_renderer, 0, 0, 0, 255);
-    SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
-
-    create_main_menu();
-
-    if (!m_sound.init())
+    if (!m_sound_device.init())
         return false;
 
-    m_cpu.set_sound_device(&m_sound);
+    std::srand(time(NULL));
 
     return true;
 }
 
-void Chip8::run()
+void CHIP8::reset()
 {
-    int cycles = 0;
+    m_registers.PC = ResetVector;
+    m_registers.SP = 0x00;
+    m_registers.I = 0x00;
+    m_delay_timer = 0;
+    m_sound_timer = 0;
 
-    while (!m_exit)
-    {
-        if (m_rom_loaded && !m_paused)
-        {
-            m_cpu.execute();
-            cycles++;
-        }
+    m_opcode.type = 0;
+    m_opcode.x = 0;
+    m_opcode.y = 0;
+    m_opcode.n = 0;
+    m_opcode.kk = 0;
+    m_opcode.nnn = 0;
 
-        process_input();
-        if (m_cpu.display_updated())
-            render();
+    for (int index = 0; index < 16; index++)
+        m_registers.V[index] = 0x00;
 
-        if (cycles == TimersCycleDivision)
-        {
-            m_cpu.update_timers();
-            cycles = 0;
-        }
-
-        std::this_thread::sleep_for(std::chrono::microseconds(1));
-    }
+    std::memset(m_stack, 0x00, sizeof(m_stack));
+    std::memset(m_display, 0x00, sizeof(m_display));
+    m_display_updated = true;
 }
 
-void Chip8::create_main_menu()
+void CHIP8::execute()
 {
-    m_menu_bar = CreateMenu();
-    m_file_menu = CreateMenu();
-    m_emulator_menu = CreateMenu();
-
-    AppendMenu(m_menu_bar, MF_POPUP, (UINT_PTR)m_file_menu, "File");
-    AppendMenu(m_menu_bar, MF_POPUP, (UINT_PTR)m_emulator_menu, "Emulator");
-
-    AppendMenu(m_file_menu, MF_STRING, MENU_ID_LOAD_ROM, "Open ROM...\tCtr+O");
-    AppendMenu(m_file_menu, MF_SEPARATOR, 0, "");
-    AppendMenu(m_file_menu, MF_STRING, MENU_ID_EXIT, "Exit\tAlt+F4");
-
-    AppendMenu(m_emulator_menu, MF_STRING, MENU_ID_PAUSE_RESUME, "Pause\tCtr+P");
-    AppendMenu(m_emulator_menu, MF_SEPARATOR, 0, "");
-    AppendMenu(m_emulator_menu, MF_STRING, MENU_ID_RESET, "Reset\tCtr+R");
-
-    HWND window_handle = get_window_handle(m_window);
-    SetMenu(window_handle, m_menu_bar);
+    fetch();
+    execute_instruction();
 }
 
-void Chip8::process_input()
+bool CHIP8::load_rom_in_memory(const char* rom, uint32_t size)
 {
-    SDL_Event event {};
+    assert(rom);
+    if ((MemorySize - ResetVector) < size)
+        return false;
 
-    while (SDL_PollEvent(&event))
+    memory_cleanup();
+
+    for (int index = 0; index < size; index++)
+        m_memory[index + ResetVector] = (uint8_t)rom[index];
+
+    reset();
+
+    return true;
+}
+
+void CHIP8::stack_push(uint16_t value)
+{
+    m_stack[m_registers.SP] = value;
+    m_registers.SP++;
+}
+
+uint16_t CHIP8::stack_pop()
+{
+    m_registers.SP--;
+    return m_stack[m_registers.SP];
+}
+
+uint8_t CHIP8::read(uint16_t address)
+{
+    assert(address < MemorySize);
+    return m_memory[address];
+}
+
+uint16_t CHIP8::read_word(uint16_t address)
+{
+    return (read(address) << 8 | read(address + 1));
+}
+
+void CHIP8::write(uint16_t address, uint8_t value)
+{
+    assert(address < MemorySize);
+    m_memory[address] = value;
+}
+
+void CHIP8::memory_cleanup()
+{
+    std::memset(m_memory, 0x00, sizeof(m_memory));
+
+    // Copy font data
+    for (int index = 0; index < FontSize; index++)
+        m_memory[index] = m_font[index];
+}
+
+void CHIP8::draw_pixel()
+{
+    auto x = m_registers.V[m_opcode.x];
+    auto y = m_registers.V[m_opcode.y];
+    auto height = m_opcode.n;
+
+    m_registers.V[0xF] = 0;
+    for (uint8_t row = 0; row < height; row++)
     {
-        switch (event.type)
+        uint8_t data = m_memory[m_registers.I + row];
+        for (uint8_t column = 0; column < 8; column++)
         {
-        case SDL_SYSWMEVENT:
-            if (event.syswm.msg->msg.win.msg == WM_COMMAND)
+            if ((data & 0x80) != 0)
             {
-                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_LOAD_ROM)
-                    open_rom_file();
-
-                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_EXIT)
-                    m_exit = true;
-
-                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_PAUSE_RESUME)
-                    toggle_pause();
-
-                if (LOWORD(event.syswm.msg->msg.win.wParam) == MENU_ID_RESET)
-                    reset();
-            }
-            break;
-
-        case SDL_QUIT:
-            m_exit = true;
-            break;
-
-        case SDL_KEYDOWN:
-            if (event.key.keysym.sym == SDLK_o &&
-                event.key.keysym.mod & KMOD_CTRL &&
-                event.key.repeat == 0)
-            {
-                open_rom_file();
+                if (m_display[(x + column + ((y + row) * 64))] == 1)
+                {
+                    m_registers.V[0xF] = 1;
+                }
+                m_display[x + column + ((y + row) * 64)] ^= 1;
             }
 
-            if (event.key.keysym.sym == SDLK_p &&
-                event.key.keysym.mod & KMOD_CTRL &&
-                event.key.repeat == 0)
-            {
-                toggle_pause();
-            }
-
-            if (event.key.keysym.sym == SDLK_r &&
-                event.key.keysym.mod & KMOD_CTRL &&
-                event.key.repeat == 0)
-            {
-                reset();
-            }
-            break;
-
-        case SDL_WINDOWEVENT:
-            if (event.window.event == SDL_WINDOWEVENT_RESIZED)
-            {
-                m_window_width = event.window.data1;
-                m_window_height = event.window.data2;
-            }
-            break;
-
-        default:
-            break;
+            data <<= 1;
         }
     }
+
+    m_display_updated = true;
 }
 
-void Chip8::update_screen_buffer()
+bool CHIP8::wait_key_press()
 {
-    for (int index = 0; index < (CPU::DisplayWidth * CPU::DisplayHeight); index++)
+    bool key_pressed = false;
+
+    for (int index = 0; index < KeyCount; index++)
     {
-        uint8_t pixel = m_cpu.get_display()[index];
-        m_screen_buffer[index] = (0x00FFFF00 * pixel) | 0xFF000000;
+        if (SDL_GetKeyboardState(nullptr)[m_keymap[index]])
+        {
+            m_registers.V[m_opcode.x] = index;
+            key_pressed = true;
+        }
+    }
+
+    return key_pressed;
+}
+
+void CHIP8::fetch()
+{
+    uint16_t value = read_word(m_registers.PC);
+
+    // Decode instruction
+    m_opcode.type = (value >> 12) & 0x000F;
+    m_opcode.x = (value >> 8) & 0x000F;
+    m_opcode.y = (value >> 4) & 0x000F;
+    m_opcode.n = value & 0x000F;
+    m_opcode.kk = value & 0x00FF;
+    m_opcode.nnn = value & 0x0FFF;
+
+    // Increment program counter
+    m_registers.PC += 2;
+}
+
+void CHIP8::execute_instruction()
+{
+    switch (m_opcode.type)
+    {
+    case 0x0:
+        switch (m_opcode.nnn)
+        {
+        case 0x0E0:
+            std::memset(m_display, 0x00, sizeof(m_display));
+            m_display_updated = true;
+            break;
+
+        case 0x00EE:
+            m_registers.PC = stack_pop();
+            break;
+        }
+        break;
+
+    case 0x1:
+        m_registers.PC = m_opcode.nnn;
+        break;
+
+    case 0x2:
+        stack_push(m_registers.PC);
+        m_registers.PC = m_opcode.nnn;
+        break;
+
+    case 0x3:
+        if (m_registers.V[m_opcode.x] == m_opcode.kk)
+            m_registers.PC += 2;
+        break;
+
+    case 0x4:
+        if (m_registers.V[m_opcode.x] != m_opcode.kk)
+            m_registers.PC += 2;
+        break;
+
+    case 0x5:
+        if (m_registers.V[m_opcode.x] == m_registers.V[m_opcode.y])
+            m_registers.PC += 2;
+        break;
+
+    case 0x6:
+        m_registers.V[m_opcode.x] = m_opcode.kk;
+        break;
+
+    case 0x7:
+        m_registers.V[m_opcode.x] += m_opcode.kk;
+        break;
+
+    case 0x8:
+        switch (m_opcode.n)
+        {
+        case 0x0:
+            m_registers.V[m_opcode.x] = m_registers.V[m_opcode.y];
+            break;
+
+        case 0x1:
+            m_registers.V[m_opcode.x] |= m_registers.V[m_opcode.y];
+            break;
+
+        case 0x2:
+            m_registers.V[m_opcode.x] &= m_registers.V[m_opcode.y];
+            break;
+
+        case 0x3:
+            m_registers.V[m_opcode.x] ^= m_registers.V[m_opcode.y];
+            break;
+
+        case 0x4:
+            m_registers.V[0xF] = (((uint16_t)m_registers.V[m_opcode.x] + (uint16_t)m_registers.V[m_opcode.y]) > 0xFF) ? 1 : 0;
+            m_registers.V[m_opcode.x] += m_registers.V[m_opcode.y];
+            break;
+
+        case 0x5:
+            m_registers.V[0xF] = (m_registers.V[m_opcode.x] > m_registers.V[m_opcode.y]) ? 1 : 0;
+            m_registers.V[m_opcode.x] -= m_registers.V[m_opcode.y];
+            break;
+
+        case 0x6:
+            m_registers.V[0xF] = m_registers.V[m_opcode.x] & 1;
+            m_registers.V[m_opcode.x] >>= 1;
+            break;
+
+        case 0x7:
+            m_registers.V[0xF] = (m_registers.V[m_opcode.y] > m_registers.V[m_opcode.x]) ? 1 : 0;
+            m_registers.V[m_opcode.x] = m_registers.V[m_opcode.y] - m_registers.V[m_opcode.x];
+            break;
+
+        case 0xE:
+            m_registers.V[0xF] = (m_registers.V[m_opcode.y] >> 7) & 1;
+            m_registers.V[m_opcode.x] = m_registers.V[m_opcode.y] << 1;
+            break;
+        }
+        break;
+
+    case 0x9:
+        if (m_registers.V[m_opcode.x] != m_registers.V[m_opcode.y])
+            m_registers.PC += 2;
+        break;
+
+    case 0xA:
+        m_registers.I = m_opcode.nnn;
+        break;
+
+    case 0xB:
+        m_registers.PC = m_opcode.nnn + m_registers.V[0];
+        break;
+
+    case 0xC:
+        m_registers.V[m_opcode.x] = (std::rand() % 0xFF) & m_opcode.kk;
+        break;
+
+    case 0xD:
+        draw_pixel();
+        break;
+
+    case 0xE:
+        switch (m_opcode.kk)
+        {
+        case 0x9E:
+            if (SDL_GetKeyboardState(nullptr)[m_keymap[m_registers.V[m_opcode.x] & 15]])
+                m_registers.PC += 2;
+            break;
+
+        case 0xA1:
+            if (!SDL_GetKeyboardState(nullptr)[m_keymap[m_registers.V[m_opcode.x] & 15]])
+                m_registers.PC += 2;
+            break;
+        }
+        break;
+
+    case 0xF:
+        switch (m_opcode.kk)
+        {
+        case 0x07:
+            m_registers.V[m_opcode.x] = m_delay_timer;
+            break;
+
+        case 0x0A:
+            if (!wait_key_press())
+                m_registers.PC -= 2;
+                return;
+            break;
+
+        case 0x15:
+            m_delay_timer =m_registers.V[m_opcode.x];
+            break;
+
+        case 0x18:
+            m_sound_timer = m_registers.V[m_opcode.x];
+            break;
+
+        case 0x1E:
+            m_registers.V[0xF] = ((m_registers.I + m_registers.V[m_opcode.x]) > 0xFFF) ? 1 : 0;
+            m_registers.I += m_registers.V[m_opcode.x];
+            break;
+
+        case 0x29:
+            m_registers.I = m_registers.V[m_opcode.x] * 5;
+            break;
+
+        case 0x33:
+            m_memory[m_registers.I & 0xFFF] = (m_registers.V[m_opcode.x] % 1000) / 100;
+            m_memory[(m_registers.I + 1) & 0xFFF] =  (m_registers.V[m_opcode.x] % 10) / 10;
+            m_memory[(m_registers.I + 2) & 0xFFF] = m_registers.V[m_opcode.x] % 10;
+            break;
+
+        case 0x55:
+            for (int index = 0; index <= m_opcode.x; index++)
+                m_memory[(m_registers.I++) & 0xFFF] = m_registers.V[index];
+            break;
+
+        case 0x65:
+            for (int index = 0; index <= m_opcode.x; index++)
+                m_registers.V[index] = m_memory[(m_registers.I++) & 0xFFF];
+            break;
+        }
+        break;
     }
 }
 
-void Chip8::render()
+void CHIP8::update_timers()
 {
-    SDL_RenderClear(m_renderer);
-    update_screen_buffer();
-    SDL_UpdateTexture(m_screen_texture, nullptr, m_screen_buffer, CPU::DisplayWidth * sizeof(uint32_t));
-    SDL_RenderCopy(m_renderer, m_screen_texture, nullptr, nullptr);
-    SDL_RenderPresent(m_renderer);
-    m_cpu.display_rendered();
-}
+    if (m_delay_timer > 0)
+        m_delay_timer--;
 
-void Chip8::open_rom_file()
-{
-    std::string path = open_file_dialog(m_window);
-    if (path.empty())
-        return;
-
-    std::ifstream rom_file(path, std::ifstream::binary);
-    if (!rom_file.is_open())
+    if (m_sound_timer > 0)
     {
-        std::string message = "Cannot open ROM file " + path;
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), m_window);
-        return;
+        m_sound_device.play();
+        m_sound_timer--;
     }
-
-    uint32_t buffer_size = get_file_size(path);
-    char* buffer = static_cast<char*>(malloc(sizeof(char) * buffer_size));
-    if (!rom_file.read(buffer, buffer_size))
-    {
-        std::string message = "Cannot read ROM file " + path;
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), m_window);
-        return;
-    }
-
-    if (!m_cpu.load_rom_in_memory(buffer, buffer_size))
-    {
-        std::string message = "Cannot load ROM file " + path + " into memory, size is " + std::to_string(buffer_size);
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), m_window);
-        return;
-    }
-
-    m_rom_loaded = true;
-    free(buffer);
-}
-
-void Chip8::toggle_pause()
-{
-    if (!m_rom_loaded)
-        return;
-
-    m_paused = !m_paused;
-
-    if (m_paused)
-        ModifyMenu(m_emulator_menu, MENU_ID_PAUSE_RESUME, MF_STRING, MENU_ID_PAUSE_RESUME, "Resume\tCrt+P");
     else
-        ModifyMenu(m_emulator_menu, MENU_ID_PAUSE_RESUME, MF_STRING, MENU_ID_PAUSE_RESUME, "Pause\tCrt+P");
-}
-
-void Chip8::reset()
-{
-    if (!m_rom_loaded)
-        return;
-
-    if (m_paused)
-        toggle_pause();
-
-    m_cpu.reset();
-}
-
-HWND Chip8::get_window_handle(SDL_Window* window)
-{
-    if (!window)
-        return nullptr;
-
-    SDL_SysWMinfo win_info {};
-    SDL_VERSION(&win_info.version);
-    SDL_GetWindowWMInfo(window, &win_info);
-
-    return win_info.info.win.window;
-}
-
-std::string Chip8::open_file_dialog(SDL_Window* owner)
-{
-    constexpr auto PATH_MAX_SIZE = 256;
-
-    CHAR file_name[PATH_MAX_SIZE] = { 0 };
-    CHAR current_dir[PATH_MAX_SIZE] = { 0 };
-
-    OPENFILENAMEA ofn;
-    ZeroMemory(&ofn, sizeof(OPENFILENAME));
-
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = get_window_handle(owner);
-    ofn.lpstrFile = file_name;
-    ofn.nMaxFile = sizeof(file_name);
-    ofn.lpstrFilter = "Chip8 ROM (*.ch8)\0 *.ch8\0All Files (*.*)\0 * .*\0";
-    ofn.nFilterIndex = 1;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-
-    if (GetCurrentDirectoryA(PATH_MAX_SIZE, current_dir))
-        ofn.lpstrInitialDir = current_dir;
-
-    if (GetOpenFileNameA(&ofn) == TRUE)
-        return ofn.lpstrFile;
-
-    return {};
+    {
+        m_sound_device.stop();
+    }
 }

@@ -1,9 +1,9 @@
-#include "chip8.hpp"
+#include "emulator.hpp"
 #include <Windows.h>
 
 int application_main(int argc, char* argv[])
 {
-    Chip8 chip8;
+    Emulator chip8;
     if (!chip8.init())
         return -1;
     chip8.run();

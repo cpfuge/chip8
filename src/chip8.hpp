@@ -1,59 +1,72 @@
 #pragma once
 
-#include "cpu.hpp"
 #include "sound.hpp"
 #include <cstdint>
-#include <string>
-#include <Windows.h>
 
-struct SDL_Window;
-struct SDL_Renderer;
-struct SDL_Texture;
-
-class Chip8
+class CHIP8
 {
 public:
-    Chip8();
-    ~Chip8();
+    CHIP8();
 
     bool init();
-    void run();
+    void reset();
+    void execute();
+    void update_timers();
+    bool load_rom_in_memory(const char* rom, uint32_t size);
+    bool display_updated() { return m_display_updated; }
+    void display_rendered() { m_display_updated = false; }
+    const uint8_t* get_display() const { return m_display; }
+
+    static inline constexpr auto MemorySize = 4096;
+    static inline constexpr auto StackSize = 16;
+    static inline constexpr auto FontSize = 80;
+    static inline constexpr auto ResetVector = 0x200;
+    static inline constexpr auto DisplayWidth = 64;
+    static inline constexpr auto DisplayHeight = 32;
+    static inline constexpr auto KeyCount = 16;
+
+    struct Registers
+    {
+        uint16_t PC = 0x0000;
+        uint16_t SP = 0x0000;
+        uint16_t I = 0x0000;
+        uint8_t V[16] = { 0 };
+    };
+
+    struct Opcode
+    {
+        uint16_t type = 0x0000;
+        uint16_t x = 0x0000;
+        uint16_t y = 0x0000;
+        uint16_t n = 0x0000;
+        uint16_t kk = 0x0000;
+        uint16_t nnn = 0x0000;
+    };
 
 private:
-    SDL_Window* m_window = nullptr;
-    SDL_Renderer* m_renderer = nullptr;
-    SDL_Texture* m_screen_texture = nullptr;
+    Registers m_registers;
+    Opcode m_opcode;
+    uint8_t m_memory[MemorySize] = { 0 };
+    uint16_t m_stack[StackSize] = { 0 };
+    uint8_t m_delay_timer = 0;
+    uint8_t m_sound_timer = 0;
+    static uint8_t m_font[FontSize];
+    uint8_t m_display[DisplayWidth * DisplayHeight] = { 0 };
+    bool m_display_updated = false;
+    static int m_keymap[KeyCount];
 
-    Sound m_sound;
+    Sound m_sound_device;
 
-    int m_window_width = 800;
-    int m_window_height = 600;
-    bool m_exit = false;
-    bool m_rom_loaded = false;
-    bool m_paused = false;
-    uint32_t m_screen_buffer[CPU::DisplayWidth * CPU::DisplayHeight] = { 0 };
+    void stack_push(uint16_t value);
+    uint16_t stack_pop();
 
-    CPU m_cpu;
+    uint8_t read(uint16_t address);
+    uint16_t read_word(uint16_t address);
+    void write(uint16_t address, uint8_t value);
 
-    static inline constexpr auto TimersCycleDivision = 9;
-
-    static inline constexpr auto MENU_ID_LOAD_ROM = 1;
-    static inline constexpr auto MENU_ID_EXIT = 2;
-    static inline constexpr auto MENU_ID_PAUSE_RESUME = 3;
-    static inline constexpr auto MENU_ID_RESET = 4;
-
-    HMENU m_menu_bar;
-    HMENU m_file_menu;
-    HMENU m_emulator_menu;
-
-    void create_main_menu();
-    void process_input();
-    void update_screen_buffer();
-    void render();
-
-    void open_rom_file();
-    void toggle_pause();
-    void reset();
-    HWND Chip8::get_window_handle(SDL_Window* window);
-    std::string Chip8::open_file_dialog(SDL_Window* owner);
+    void memory_cleanup();
+    void draw_pixel();
+    bool wait_key_press();
+    void fetch();
+    void execute_instruction();
 };

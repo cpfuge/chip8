@@ -1,6 +1,6 @@
 set(SOURCE_FILES
     "chip8.cpp"
-    "cpu.cpp"
+    "emulator.cpp"
     "main.cpp"
     "sound.cpp"
     )
