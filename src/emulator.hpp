@@ -24,6 +24,7 @@ private:
     SDL_Renderer* m_renderer = nullptr;
     SDL_Texture* m_screen_texture = nullptr;
 
+    std::string m_window_title = "CHIP-8";
     int m_window_width = 800;
     int m_window_height = 600;
     bool m_exit = false;
@@ -52,6 +53,8 @@ private:
     void open_rom_file();
     void toggle_pause();
     void reset();
+
+    void set_window_title(const std::string& title);
 
     HWND get_window_handle(SDL_Window* window);
     std::string open_file_dialog(SDL_Window* owner);

@@ -23,16 +23,16 @@ bool Emulator::init()
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
     {
         std::string message = "SDL_Init error: " + std::string(SDL_GetError());
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), nullptr);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, m_window_title.c_str(), message.c_str(), nullptr);
         return false;
     }
 
     uint32_t window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN;
-    m_window = SDL_CreateWindow("CHIP-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_window_width, m_window_height, window_flags);
+    m_window = SDL_CreateWindow(m_window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_window_width, m_window_height, window_flags);
     if (!m_window)
     {
         std::string message = "SDL_CreateWindow error: " + std::string(SDL_GetError());
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), nullptr);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, m_window_title.c_str(), message.c_str(), nullptr);
         return false;
     }
 
@@ -40,7 +40,7 @@ bool Emulator::init()
     if (!m_renderer)
     {
         std::string message = "SDL_CreateRenderer error: " + std::string(SDL_GetError());
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), nullptr);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, m_window_title.c_str(), message.c_str(), nullptr);
         return false;
     }
 
@@ -48,7 +48,7 @@ bool Emulator::init()
     if (!m_screen_texture)
     {
         std::string message = "SDL_CreateTexture error: " + std::string(SDL_GetError());
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), nullptr);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, m_window_title.c_str(), message.c_str(), nullptr);
         return false;
     }
 
@@ -205,7 +205,7 @@ void Emulator::open_rom_file()
     if (!rom_file.is_open())
     {
         std::string message = "Cannot open ROM file " + path;
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), m_window);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, m_window_title.c_str(), message.c_str(), m_window);
         return;
     }
 
@@ -214,17 +214,23 @@ void Emulator::open_rom_file()
     if (!rom_file.read(buffer, buffer_size))
     {
         std::string message = "Cannot read ROM file " + path;
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), m_window);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, m_window_title.c_str(), message.c_str(), m_window);
         return;
     }
 
     if (!m_chip8.load_rom_in_memory(buffer, buffer_size))
     {
         std::string message = "Cannot load ROM file " + path + " into memory, size is " + std::to_string(buffer_size);
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CHIP-8", message.c_str(), m_window);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, m_window_title.c_str(), message.c_str(), m_window);
         return;
     }
 
+
+    if (m_paused)
+        toggle_pause();
+
+    m_window_title = "CHIP-8 [" + path + "]";
+    set_window_title(m_window_title + " Running");
     m_rom_loaded = true;
     free(buffer);
 }
@@ -237,9 +243,15 @@ void Emulator::toggle_pause()
     m_paused = !m_paused;
 
     if (m_paused)
+    {
+        set_window_title(m_window_title + " Paused");
         ModifyMenu(m_emulator_menu, MENU_ID_PAUSE_RESUME, MF_STRING, MENU_ID_PAUSE_RESUME, "Resume\tCrt+P");
+    }
     else
+    {
+        set_window_title(m_window_title + " Running");
         ModifyMenu(m_emulator_menu, MENU_ID_PAUSE_RESUME, MF_STRING, MENU_ID_PAUSE_RESUME, "Pause\tCrt+P");
+    }
 }
 
 void Emulator::reset()
@@ -251,6 +263,14 @@ void Emulator::reset()
         toggle_pause();
 
     m_chip8.reset();
+}
+
+void Emulator::set_window_title(const std::string& title)
+{
+    if (!m_window)
+        return;
+
+    SDL_SetWindowTitle(m_window, title.c_str());
 }
 
 HWND Emulator::get_window_handle(SDL_Window* window)
